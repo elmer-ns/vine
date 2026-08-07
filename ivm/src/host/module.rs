@@ -1,4 +1,7 @@
-use ivy::name::NameId;
+use core::fmt;
+use std::error::Error;
+
+use ivy::{name::NameId, text::ast::Diag};
 
 use crate::{
   host::ext::ExtTyRegister,
@@ -11,7 +14,25 @@ pub enum RunError {
 }
 
 #[derive(Debug)]
-pub enum CompileError {}
+pub enum CompileError {
+  Ivy(Diag),
+}
+
+impl fmt::Display for CompileError {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      CompileError::Ivy(diag) => write!(f, "invalid Ivy: {diag}"),
+    }
+  }
+}
+
+impl Error for CompileError {}
+
+impl From<Diag> for CompileError {
+  fn from(error: Diag) -> Self {
+    CompileError::Ivy(error)
+  }
+}
 
 /// An immutable, reusable handle to compiled Ivy code.
 ///

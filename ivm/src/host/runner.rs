@@ -15,7 +15,8 @@ use crate::{
     Host,
     dynamic::{IvyRequest, IvyService},
     ext::common::{self, IO},
-    loader::{IvyLoader, LoadError},
+    loader::IvyLoader,
+    module::CompileError,
   },
   program::Program,
   runtime::{
@@ -33,7 +34,7 @@ pub struct Runner<'ivm, 'ext> {
   host: &'ext Host<'ivm>,
   ivy_loader: IvyLoader,
   ivy_service: IvyService<'ivm>,
-  ivy_errors: Vec<LoadError>,
+  ivy_errors: Vec<CompileError>,
 
   io: ExtTy<'ivm, IO>,
   runtime: Runtime<'ivm, 'ext>,
@@ -200,7 +201,7 @@ impl Write for SharedWriter<'_> {
 pub struct RunOutcome {
   pub stats: Stats,
   pub flags: Flags,
-  pub ivy_errors: Vec<LoadError>,
+  pub ivy_errors: Vec<CompileError>,
 }
 
 impl RunOutcome {

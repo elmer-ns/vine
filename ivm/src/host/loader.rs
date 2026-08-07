@@ -1,41 +1,16 @@
-use std::{error::Error, fmt};
-
-use ivy::{
-  name::Table,
-  text::{ast::Diag, parser::Parser},
-};
+use ivy::{name::Table, text::parser::Parser};
 
 use crate::{
-  host::{Host, module::IvyModule},
+  host::{
+    Host,
+    module::{CompileError, IvyModule},
+  },
   program::Program,
   runtime::graft::Graft,
 };
 
 pub struct IvyLoader {
   table: Table,
-}
-
-#[derive(Debug)]
-pub enum LoadError {
-  Ivy(Diag),
-  MissingMain,
-}
-
-impl fmt::Display for LoadError {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      LoadError::Ivy(diag) => write!(f, "invalid Ivy: {diag}"),
-      LoadError::MissingMain => write!(f, "the loaded program does not define 'iv:main'"),
-    }
-  }
-}
-
-impl Error for LoadError {}
-
-impl From<Diag> for LoadError {
-  fn from(error: Diag) -> Self {
-    LoadError::Ivy(error)
-  }
 }
 
 impl<'ivm> IvyLoader {
@@ -49,31 +24,7 @@ impl<'ivm> IvyLoader {
   ///
   /// May panic if the parsed Ivy cannot be encoded by the IVM, including
   /// references to unregistered extrinsics or malformed node arities.
-  pub fn load_main(
-    &mut self,
-    host: &Host<'ivm>,
-    src: &str,
-  ) -> Result<&'ivm Graft<'ivm>, LoadError> {
-    let nets = Parser::parse(&mut self.table, src)?;
-    let nets = nets.to_flat_nets()?;
-
-    let main = self.table.add_path_name("iv:main");
-
-    if !nets.contains_key(&main) {
-      return Err(LoadError::MissingMain);
-    }
-
-    let program = Program::new(host, &mut self.table, &nets);
-    let program: &Program = host.ivm.programs.push(Box::new(program));
-
-    Ok(program.graft(main).expect("main was checked before building"))
-  }
-
-  /// # Panics
-  ///
-  /// May panic if the parsed Ivy cannot be encoded by the IVM, including
-  /// references to unregistered extrinsics or malformed node arities.
-  pub fn compile(&mut self, host: &Host<'ivm>, src: &str) -> Result<IvyModule<'ivm>, LoadError> {
+  pub fn compile(&mut self, host: &Host<'ivm>, src: &str) -> Result<IvyModule<'ivm>, CompileError> {
     let nets = Parser::parse(&mut self.table, src)?;
     let nets = nets.to_flat_nets()?;
 

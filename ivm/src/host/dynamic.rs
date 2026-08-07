@@ -9,10 +9,7 @@ use vine_util::register::Register;
 use crate::{
   host::{
     Host,
-    ext::{
-      ExtFn, ExtOutput, FromRegister,
-      common::{Nil, Pair},
-    },
+    ext::{ExtFn, ExtOutput, FromRegister, common::Pair},
     module::IvyModule,
   },
   runtime::{
@@ -83,13 +80,9 @@ fn finish_ok<'ivm>() -> impl Register<Host<'ivm>> {
 }
 
 type CompileResult<'ivm> = Result<IvyModule<'ivm>, String>;
-type LoadResult = Result<Nil, String>;
 
 type CompileResultEncoder<'ivm> =
   Box<dyn Fn(&mut Runtime<'ivm, '_>, CompileResult<'ivm>) -> ExtVal<'ivm> + Send + Sync + 'ivm>;
-
-type UpdateResultEncoder<'ivm> =
-  Box<dyn Fn(&mut Runtime<'ivm, '_>, LoadResult) -> ExtVal<'ivm> + Send + Sync + 'ivm>;
 
 type StringEncoder<'ivm> =
   Box<dyn Fn(&mut Runtime<'ivm, '_>, String) -> ExtVal<'ivm> + Send + Sync + 'ivm>;
@@ -119,10 +112,6 @@ impl<'ivm> IvyService<'ivm> {
       .get(&finish_ok_name)
       .expect("root:ivy:finish_ok was just registered")
       .bits();
-
-    // This encodes Rust Result<Nil, String> as Vine Result[(), String].
-    let encode_update_result =
-      Box::new(<LoadResult as ExtOutput<'ivm, Result<FromRegister, ()>>>::register(host, table));
 
     let encode_string = Box::new(<String as ExtOutput<'ivm, ()>>::register(host, table));
 
