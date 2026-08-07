@@ -3,6 +3,7 @@ use #root::Ext;
 
 pub type LoadError = String;
 pub type CompileError = String;
+pub type RunError = String;
 
 pub type Module;
 
@@ -20,20 +21,16 @@ pub mod Module {
 
     result as Result[Module, CompileError]
   }
-}
 
-pub fn update[T; Ext[T]](source: String, &value: &T) -> Result[(), LoadError] {
-  let result: Ext = safe $ivy {
-    ${value} = vi:ext#2[root:ivy:update](${source as Ext} ^ ${~value})
-  };
+  pub fn .run[I, O; Ext[I], Ext[O]](
+    module: Module,
+    entry: String,
+    input: I,
+  ) -> Result[O, (RunError, I)] {
+    let result: Ext[Result[O, (RunError, I)]] = safe $ivy {
+      ${module as Ext} = vi:ext#3[root:ivy:module:run](${entry as Ext} ${input as Ext} ^)
+    };
 
-  result as Result[(), String]
-}
-
-pub fn apply[I, O; Ext[I], Ext[O]](source: String, input: I) -> Result[O, (LoadError, I)] {
-  let result: Ext[Result[O, (LoadError, I)]] = safe $ivy {
-    ${input as Ext} = vi:ext#2[root:ivy:apply](${source as Ext} ^)
-  };
-
-  result as Result[O, (LoadError, I)]
+    result as Result[O, (RunError, I)]
+  }
 }

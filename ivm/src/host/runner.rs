@@ -14,7 +14,7 @@ use crate::{
   host::{
     Host,
     dynamic::{IvyRequest, IvyService},
-    ext::common::{self, IO, Nil},
+    ext::common::{self, IO},
     loader::{IvyLoader, LoadError},
   },
   program::Program,
@@ -51,8 +51,6 @@ impl<'ivm, 'ext> Runner<'ivm, 'ext> {
     let io = host.register_ext_ty::<IO>();
 
     let ivy_requests = IvyService::new(host, table);
-
-    let compile = table.add_path_name("root:ivy:module:compile");
 
     host.register(table, extrinsics);
 
@@ -128,47 +126,19 @@ impl<'ivm, 'ext> Runner<'ivm, 'ext> {
 
           self.ivy_service.write_compile_result(&mut self.runtime, output, result);
         }
-        IvyRequest::Update { source, value, result_output, value_output } => {
-          match self.ivy_loader.load_main(self.host, &source) {
-            Ok(main) => {
-              // `Ok(())`: source loaded and main was spliced successfully.
-              self.ivy_service.write_results(&mut self.runtime, result_output, Ok(Nil));
-
-              // Adapt the loaded main's IO→IO boundary to the suspended
-              // extrinsic input and output.
-              let node = unsafe { self.runtime.new_node(Tag::Comb, 0) };
-
-              self.runtime.link_wire(node.1, Port::new_ext_val(value));
-
-              self.runtime.link_wire_wire(node.2, value_output);
-
-              self.runtime.link(Port::new_graft(main), node.0);
-            }
-            Err(error) => {
-              self.ivy_service.write_results(
-                &mut self.runtime,
-                result_output,
-                Err(error.to_string()),
-              );
-
-              // Preserve the IO continuation despite the load failure.
-              self.runtime.link_wire(value_output, Port::new_ext_val(value));
-            }
-          }
-        }
-        IvyRequest::Apply { source, input, result_output } => {
-          match self.ivy_loader.load_main(self.host, &source) {
-            Ok(main) => {
-              let main_node = unsafe { self.runtime.new_node(Tag::Comb, 0) };
+        IvyRequest::Run { module, entry, input, result_output } => {
+          match self.ivy_loader.entry(module, &entry) {
+            Some(entry) => {
+              let entry_node = unsafe { self.runtime.new_node(Tag::Comb, 0) };
 
               let finish_node =
                 unsafe { self.runtime.new_node(Tag::ExtFn, self.ivy_service.finish_ok_label()) };
 
               // I → loaded iv:main
-              self.runtime.link_wire(main_node.1, Port::new_ext_val(input));
+              self.runtime.link_wire(entry_node.1, Port::new_ext_val(input));
 
               // Loaded O → finish_ok principal port
-              self.runtime.link_wire(main_node.2, finish_node.0);
+              self.runtime.link_wire(entry_node.2, finish_node.0);
 
               // finish_ok's first output → caller's Result
               self.runtime.link_wire_wire(finish_node.1, result_output);
@@ -177,13 +147,13 @@ impl<'ivm, 'ext> Runner<'ivm, 'ext> {
               self.runtime.link_wire(finish_node.2, Port::ERASE);
 
               // Start the loaded graft.
-              self.runtime.link(Port::new_graft(main), main_node.0);
+              self.runtime.link(Port::new_graft(entry), entry_node.0);
             }
-            Err(error) => {
-              self.ivy_service.write_apply_error(
+            None => {
+              self.ivy_service.write_run_error(
                 &mut self.runtime,
                 result_output,
-                error.to_string(),
+                String::from(format!("Entry '{}' doesn't exist", entry)),
                 input,
               );
             }

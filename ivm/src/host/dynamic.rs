@@ -24,22 +24,8 @@ use crate::{
 };
 
 pub enum IvyRequest<'ivm> {
-  Compile {
-    source: String,
-    output: Wire<'ivm>,
-  },
-
-  Update {
-    source: String,
-    value: ExtVal<'ivm>,
-    result_output: Wire<'ivm>,
-    value_output: Wire<'ivm>,
-  },
-  Apply {
-    source: String,
-    input: ExtVal<'ivm>,
-    result_output: Wire<'ivm>,
-  },
+  Compile { source: String, output: Wire<'ivm> },
+  Run { module: IvyModule<'ivm>, entry: String, input: ExtVal<'ivm>, result_output: Wire<'ivm> },
 }
 
 #[derive(Clone, Default)]
@@ -58,8 +44,7 @@ impl<'ivm> IvyRequests<'ivm> {
 
   pub fn extrinsics(&self) -> impl Register<Host<'ivm>> + use<'ivm> {
     let compile_requests = self.clone();
-    let update_requests = self.clone();
-    let apply_requests = self.clone();
+    let run_requests = self.clone();
 
     (
       ExtFn("root:ivy:module:compile", move |_host: &mut Host<'ivm>, _table: &mut Table| {
@@ -67,18 +52,11 @@ impl<'ivm> IvyRequests<'ivm> {
           compile_requests.push(IvyRequest::Compile { source, output });
         }
       }),
-      ExtFn("root:ivy:update", move |_host: &mut Host<'ivm>, _table: &mut Table| {
+      ExtFn("root:ivy:module:run", move |_host: &mut Host<'ivm>, _table: &mut Table| {
         move |_rt: &mut Runtime<'ivm, '_>,
-              (value, source): (ExtVal<'ivm>, String),
-              [result_output, value_output]: [Wire<'ivm>; 2]| {
-          update_requests.push(IvyRequest::Update { source, value, result_output, value_output });
-        }
-      }),
-      ExtFn("root:ivy:apply", move |_host: &mut Host<'ivm>, _table: &mut Table| {
-        move |_rt: &mut Runtime<'ivm, '_>,
-              (input, source): (ExtVal<'ivm>, String),
+              (module, entry, input): (IvyModule<'ivm>, String, ExtVal<'ivm>),
               [result_output]: [Wire<'ivm>; 1]| {
-          apply_requests.push(IvyRequest::Apply { source, input, result_output });
+          run_requests.push(IvyRequest::Run { module, entry, input, result_output });
         }
       }),
     )
@@ -126,8 +104,6 @@ pub(crate) struct IvyService<'ivm> {
   encode_string: StringEncoder<'ivm>,
   n32: ExtTy<'ivm, u32>,
   pair: ExtTy<'ivm, Pair<'ivm>>,
-
-  encode_update_result: UpdateResultEncoder<'ivm>,
 }
 
 impl<'ivm> IvyService<'ivm> {
@@ -158,15 +134,7 @@ impl<'ivm> IvyService<'ivm> {
       Result<FromRegister, ()>,
     >>::register(host, table));
 
-    Self {
-      requests,
-      finish_ok_label,
-      encode_compile_result,
-      encode_string,
-      n32,
-      pair,
-      encode_update_result,
-    }
+    Self { requests, finish_ok_label, encode_compile_result, encode_string, n32, pair }
   }
 
   pub fn push(&self, request: IvyRequest<'ivm>) {
@@ -177,17 +145,7 @@ impl<'ivm> IvyService<'ivm> {
     self.requests.drain()
   }
 
-  pub fn write_results(
-    &self,
-    runtime: &mut Runtime<'ivm, '_>,
-    output: Wire<'ivm>,
-    result: Result<Nil, String>,
-  ) {
-    let value = (self.encode_update_result)(runtime, result);
-    runtime.link_wire(output, Port::new_ext_val(value));
-  }
-
-  pub fn write_apply_error(
+  pub fn write_run_error(
     &self,
     runtime: &mut Runtime<'ivm, '_>,
     result_output: Wire<'ivm>,

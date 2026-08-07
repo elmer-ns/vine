@@ -6,6 +6,13 @@ use crate::{
   runtime::{ext::ExtTyCastStatic, graft::Graft, word::Word},
 };
 
+pub enum RunError {
+  EntryDoesntExist,
+}
+
+#[derive(Debug)]
+pub enum CompileError {}
+
 /// An immutable, reusable handle to compiled Ivy code.
 ///
 /// The referenced graft is owned by the IVM's graft arena and remains valid
@@ -14,6 +21,16 @@ use crate::{
 pub struct IvyModule<'ivm> {
   program: &'ivm Program<'ivm>,
 }
+
+// SAFETY:
+//
+// - Every graft pointer targets an allocation owned by the IVM graft arena.
+// - Those allocations remain stable for the entire `'ivm` lifetime.
+// - Grafts are fully initialized before the Program is shared.
+// - Resolving an entry only reads the map and referenced graft.
+// - Mutating the map requires exclusive `&mut Program` access.
+unsafe impl<'ivm> Send for Program<'ivm> {}
+unsafe impl<'ivm> Sync for Program<'ivm> {}
 
 impl<'ivm> IvyModule<'ivm> {
   pub fn new(program: &'ivm Program<'ivm>) -> Self {
