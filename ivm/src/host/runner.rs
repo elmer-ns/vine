@@ -13,9 +13,9 @@ use vine_util::register::Register;
 use crate::{
   host::{
     Host,
-    dynamic::{IvyRequest, IvyService},
+    dynamic::{DynamicProgramRequest, DynamicProgramService},
     ext::common::{self, IO},
-    loader::IvyLoader,
+    loader::DynamicProgramLoader,
     module::{CompileError, GraftHandle},
   },
   program::Program,
@@ -32,8 +32,8 @@ use crate::{
 
 pub struct Runner<'ivm, 'ext> {
   host: &'ext Host<'ivm>,
-  ivy_loader: IvyLoader,
-  ivy_service: IvyService<'ivm>,
+  ivy_loader: DynamicProgramLoader,
+  ivy_service: DynamicProgramService<'ivm>,
   ivy_errors: Vec<CompileError>,
 
   io: ExtTy<'ivm, IO>,
@@ -51,11 +51,11 @@ impl<'ivm, 'ext> Runner<'ivm, 'ext> {
   ) -> Self {
     let io = host.register_ext_ty::<IO>();
 
-    let ivy_requests = IvyService::new(host, table);
+    let ivy_requests = DynamicProgramService::new(host, table);
 
     host.register(table, extrinsics);
 
-    let ivy_loader = IvyLoader::new(table);
+    let ivy_loader = DynamicProgramLoader::new(table);
 
     let program = Program::new(host, table, nets);
     let main = table.add_path_name("iv:main");
@@ -121,16 +121,16 @@ impl<'ivm, 'ext> Runner<'ivm, 'ext> {
 
     for request in requests {
       match request {
-        IvyRequest::ParseIvy { source, output } => {
+        DynamicProgramRequest::ParseIvy { source, output } => {
           let result =
-            self.ivy_loader.compile(self.host, &source).map_err(|error| error.to_string());
+            self.ivy_loader.parse_ivy(self.host, &source).map_err(|error| error.to_string());
 
           self.ivy_service.write_compile_result(&mut self.runtime, output, result);
         }
-        IvyRequest::Resolve { module, entry, output } => {
+        DynamicProgramRequest::Resolve { module, entry, output } => {
           let result = self
             .ivy_loader
-            .entry(module, &entry)
+            .graft(module, &entry)
             .map(GraftHandle::new)
             .ok_or_else(|| format!("missing Ivy entry '{entry}'"));
 
@@ -242,7 +242,7 @@ mod tests {
 
   use crate::host::{
     IVM,
-    dynamic::{IvyRequest, IvyService},
+    dynamic::{DynamicProgramService, IvyRequest},
     ext::common::Pair,
   };
 
@@ -261,10 +261,10 @@ mod tests {
 
     let io = host.register_ext_ty::<IO>();
 
-    let ivy_requests = IvyService::new(&mut host, &mut table);
+    let ivy_requests = DynamicProgramService::new(&mut host, &mut table);
 
     // Clone the table after registering root:ivy:run.
-    let ivy_loader = IvyLoader::new(&table);
+    let ivy_loader = DynamicProgramLoader::new(&table);
 
     // Host is immutable throughout execution.
     let host = &host;

@@ -9,11 +9,11 @@ use crate::{
   runtime::graft::Graft,
 };
 
-pub struct IvyLoader {
+pub struct DynamicProgramLoader {
   table: Table,
 }
 
-impl<'ivm> IvyLoader {
+impl<'ivm> DynamicProgramLoader {
   /// Creates a loader from the name table used to register the host's
   /// extrinsics. All names extrinsics must be registered before this call
   pub fn new(table: &Table) -> Self {
@@ -24,7 +24,11 @@ impl<'ivm> IvyLoader {
   ///
   /// May panic if the parsed Ivy cannot be encoded by the IVM, including
   /// references to unregistered extrinsics or malformed node arities.
-  pub fn compile(&mut self, host: &Host<'ivm>, src: &str) -> Result<ProgramHandle<'ivm>, CompileError> {
+  pub fn parse_ivy(
+    &mut self,
+    host: &Host<'ivm>,
+    src: &str,
+  ) -> Result<ProgramHandle<'ivm>, CompileError> {
     let nets = Parser::parse(&mut self.table, src)?;
     let nets = nets.to_flat_nets()?;
 
@@ -33,7 +37,7 @@ impl<'ivm> IvyLoader {
     Ok(ProgramHandle::new(host.ivm.programs.push(Box::new(program))))
   }
 
-  pub fn entry(&mut self, module: ProgramHandle<'ivm>, path: &str) -> Option<&'ivm Graft<'ivm>> {
+  pub fn graft(&mut self, module: ProgramHandle<'ivm>, path: &str) -> Option<&'ivm Graft<'ivm>> {
     let name = self.table.add_path_name(path);
     module.graft(name)
   }
@@ -69,7 +73,7 @@ mod tests {
 
     let io = host.register_ext_ty::<IO>();
 
-    let mut loader = IvyLoader::new(&table);
+    let mut loader = DynamicProgramLoader::new(&table);
     let main = loader.load_main(&host, IDENTITY_MAIN).unwrap();
 
     let mut runtime = host.init(&mut heap);
@@ -100,7 +104,7 @@ mod tests {
     let host = Host::new(&mut ivm);
     let table = Table::default();
 
-    let mut loader = IvyLoader::new(&table);
+    let mut loader = DynamicProgramLoader::new(&table);
 
     assert!(matches!(loader.load_main(&host, MISSING_MAIN), Err(LoadError::MissingMain)));
   }
@@ -118,7 +122,7 @@ mod tests {
     let host = Host::new(&mut ivm);
     let table = Table::default();
 
-    let mut loader = IvyLoader::new(&table);
+    let mut loader = DynamicProgramLoader::new(&table);
 
     assert!(matches!(loader.load_main(&host, INVALID_IVY), Err(LoadError::Ivy(_))));
   }
@@ -129,7 +133,7 @@ mod tests {
     let host = Host::new(&mut ivm);
     let table = Table::default();
 
-    let mut loader = IvyLoader::new(&table);
+    let mut loader = DynamicProgramLoader::new(&table);
 
     let first_main = loader.load_main(&host, IDENTITY_MAIN).unwrap();
     let second_main = loader.load_main(&host, IDENTITY_MAIN).unwrap();
@@ -156,7 +160,7 @@ mod tests {
       host.register(&mut table, capture.extrinsics(&args));
 
       // Clone the table only after registering the named extrinsics.
-      let mut loader = IvyLoader::new(&table);
+      let mut loader = DynamicProgramLoader::new(&table);
       let main = loader.load_main(&host, HI).unwrap();
 
       let mut runtime = host.init(&mut heap);

@@ -118,7 +118,7 @@ impl<'ivm> ExtTyCastStatic<'ivm> for ProgramHandle<'ivm> {
 pub mod tests {
   use ivy::name::Table;
 
-  use crate::host::{Host, IVM, loader::IvyLoader};
+  use crate::host::{Host, IVM, loader::DynamicProgramLoader};
 
   use super::*;
 
@@ -137,12 +137,12 @@ pub mod tests {
     let mut ivm = IVM::new();
     let host = Host::new(&mut ivm);
     let table = Table::default();
-    let mut loader = IvyLoader::new(&table);
+    let mut loader = DynamicProgramLoader::new(&table);
 
-    let module = loader.compile(&host, MULTI_ENTRY).unwrap();
+    let module = loader.parse_ivy(&host, MULTI_ENTRY).unwrap();
 
-    assert!(loader.entry(module, "iv:first").is_some());
-    assert!(loader.entry(module, "iv:second").is_some());
-    assert!(loader.entry(module, "iv:missing").is_none());
+    assert!(loader.graft(module, "iv:first").is_some());
+    assert!(loader.graft(module, "iv:second").is_some());
+    assert!(loader.graft(module, "iv:missing").is_none());
   }
 }

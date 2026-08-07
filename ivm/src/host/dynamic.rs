@@ -20,22 +20,22 @@ use crate::{
   },
 };
 
-pub enum IvyRequest<'ivm> {
+pub enum DynamicProgramRequest<'ivm> {
   ParseIvy { source: String, output: Wire<'ivm> },
   Resolve { module: ProgramHandle<'ivm>, entry: String, output: Wire<'ivm> },
 }
 
 #[derive(Clone, Default)]
-pub struct IvyRequests<'ivm> {
-  inner: Arc<Mutex<Vec<IvyRequest<'ivm>>>>,
+pub struct DynamicProgramMailbox<'ivm> {
+  inner: Arc<Mutex<Vec<DynamicProgramRequest<'ivm>>>>,
 }
 
-impl<'ivm> IvyRequests<'ivm> {
-  pub fn push(&self, request: IvyRequest<'ivm>) {
+impl<'ivm> DynamicProgramMailbox<'ivm> {
+  pub fn push(&self, request: DynamicProgramRequest<'ivm>) {
     self.inner.lock().unwrap().push(request);
   }
 
-  pub fn drain(&self) -> Vec<IvyRequest<'ivm>> {
+  pub fn drain(&self) -> Vec<DynamicProgramRequest<'ivm>> {
     take(&mut *self.inner.lock().unwrap())
   }
 
@@ -46,14 +46,14 @@ impl<'ivm> IvyRequests<'ivm> {
     (
       ExtFn("root:ivy:parse", move |_host: &mut Host<'ivm>, _table: &mut Table| {
         move |_rt: &mut Runtime<'ivm, '_>, source: String, [output]: [Wire<'ivm>; 1]| {
-          compile_requests.push(IvyRequest::ParseIvy { source, output });
+          compile_requests.push(DynamicProgramRequest::ParseIvy { source, output });
         }
       }),
       ExtFn("root:ivm:program:resolve", move |_host: &mut Host<'ivm>, _table: &mut Table| {
         move |_rt: &mut Runtime<'ivm, '_>,
               (module, entry): (ProgramHandle<'ivm>, String),
               [output]: [Wire<'ivm>; 1]| {
-          resolve_requests.push(IvyRequest::Resolve { module, entry, output });
+          resolve_requests.push(DynamicProgramRequest::Resolve { module, entry, output });
         }
       }),
       ExtFn("root:ivm:graft:invoke", move |host: &mut Host<'ivm>, _table: &mut Table| {
@@ -83,16 +83,16 @@ type ResolveResultEncoder<'ivm> =
 type CompileResultEncoder<'ivm> =
   Box<dyn Fn(&mut Runtime<'ivm, '_>, CompileResult<'ivm>) -> ExtVal<'ivm> + Send + Sync + 'ivm>;
 
-pub(crate) struct IvyService<'ivm> {
-  requests: IvyRequests<'ivm>,
+pub(crate) struct DynamicProgramService<'ivm> {
+  requests: DynamicProgramMailbox<'ivm>,
 
   encode_compile_result: CompileResultEncoder<'ivm>,
   encode_resolve_result: ResolveResultEncoder<'ivm>,
 }
 
-impl<'ivm> IvyService<'ivm> {
+impl<'ivm> DynamicProgramService<'ivm> {
   pub fn new(host: &mut Host<'ivm>, table: &mut Table) -> Self {
-    let requests = IvyRequests::default();
+    let requests = DynamicProgramMailbox::default();
 
     host.register(table, requests.extrinsics());
 
@@ -109,11 +109,11 @@ impl<'ivm> IvyService<'ivm> {
     Self { requests, encode_compile_result, encode_resolve_result }
   }
 
-  pub fn _push(&self, request: IvyRequest<'ivm>) {
+  pub fn _push(&self, request: DynamicProgramRequest<'ivm>) {
     self.requests.push(request);
   }
 
-  pub fn drain(&self) -> Vec<IvyRequest<'ivm>> {
+  pub fn drain(&self) -> Vec<DynamicProgramRequest<'ivm>> {
     self.requests.drain()
   }
 
