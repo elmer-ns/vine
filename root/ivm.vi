@@ -1,0 +1,35 @@
+
+pub mod Program {
+  use #root::Ext;
+
+  pub type ResolveError = String;
+
+  pub type Program;
+
+  use #root::util::{duplicate, erase};
+
+  pub impl : Ext[Program] = safe Ext::identity;
+  pub impl : Fork[Program] = safe duplicate;
+  pub impl : Drop[Program] = safe erase;
+
+  pub fn .resolve(Program: Program, name: String) -> Result[Graft, ResolveError] {
+    let result: Ext[Result[Graft, ResolveError]] = safe $ivy {
+      ${Program as Ext} = vi:ext#2[root:ivm:program:resolve](${name as Ext} ^)
+    };
+
+    result as Result[Graft, ResolveError]
+  }
+}
+
+pub mod Graft {
+  pub type Graft;
+  use #root::util::{duplicate, erase};
+
+  pub impl : Ext[Graft] = safe Ext::identity;
+  pub impl : Fork[Graft] = safe duplicate;
+  pub impl : Drop[Graft] = safe erase;
+
+  pub fn .invoke[I, O](graft: Graft, input: I) -> O {
+    safe $ivy { ${graft as Ext} = vi:ext#1[root:ivm:graft:invoke](${input} ^) }
+  }
+}

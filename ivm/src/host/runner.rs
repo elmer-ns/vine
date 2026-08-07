@@ -16,7 +16,7 @@ use crate::{
     dynamic::{IvyRequest, IvyService},
     ext::common::{self, IO},
     loader::IvyLoader,
-    module::CompileError,
+    module::{CompileError, GraftHandle},
   },
   program::Program,
   runtime::{
@@ -121,44 +121,20 @@ impl<'ivm, 'ext> Runner<'ivm, 'ext> {
 
     for request in requests {
       match request {
-        IvyRequest::Compile { source, output } => {
+        IvyRequest::ParseIvy { source, output } => {
           let result =
             self.ivy_loader.compile(self.host, &source).map_err(|error| error.to_string());
 
           self.ivy_service.write_compile_result(&mut self.runtime, output, result);
         }
-        IvyRequest::Run { module, entry, input, result_output } => {
-          match self.ivy_loader.entry(module, &entry) {
-            Some(entry) => {
-              let entry_node = unsafe { self.runtime.new_node(Tag::Comb, 0) };
+        IvyRequest::Resolve { module, entry, output } => {
+          let result = self
+            .ivy_loader
+            .entry(module, &entry)
+            .map(GraftHandle::new)
+            .ok_or_else(|| format!("missing Ivy entry '{entry}'"));
 
-              let finish_node =
-                unsafe { self.runtime.new_node(Tag::ExtFn, self.ivy_service.finish_ok_label()) };
-
-              // I → loaded iv:main
-              self.runtime.link_wire(entry_node.1, Port::new_ext_val(input));
-
-              // Loaded O → finish_ok principal port
-              self.runtime.link_wire(entry_node.2, finish_node.0);
-
-              // finish_ok's first output → caller's Result
-              self.runtime.link_wire_wire(finish_node.1, result_output);
-
-              // The one-output finish extrinsic does not use its second auxiliary port.
-              self.runtime.link_wire(finish_node.2, Port::ERASE);
-
-              // Start the loaded graft.
-              self.runtime.link(Port::new_graft(entry), entry_node.0);
-            }
-            None => {
-              self.ivy_service.write_run_error(
-                &mut self.runtime,
-                result_output,
-                String::from(format!("Entry '{}' doesn't exist", entry)),
-                input,
-              );
-            }
-          }
+          self.ivy_service.write_resolve_result(&mut self.runtime, output, result);
         }
       }
     }
@@ -166,6 +142,40 @@ impl<'ivm, 'ext> Runner<'ivm, 'ext> {
     true
   }
 }
+
+/*IvyRequest::Run { module, entry, input, result_output } => {
+  match self.ivy_loader.entry(module, &entry) {
+    Some(entry) => {
+      let entry_node = unsafe { self.runtime.new_node(Tag::Comb, 0) };
+
+      let finish_node =
+        unsafe { self.runtime.new_node(Tag::ExtFn, self.ivy_service.finish_ok_label()) };
+
+      // I → loaded iv:main
+      self.runtime.link_wire(entry_node.1, Port::new_ext_val(input));
+
+      // Loaded O → finish_ok principal port
+      self.runtime.link_wire(entry_node.2, finish_node.0);
+
+      // finish_ok's first output → caller's Result
+      self.runtime.link_wire_wire(finish_node.1, result_output);
+
+      // The one-output finish extrinsic does not use its second auxiliary port.
+      self.runtime.link_wire(finish_node.2, Port::ERASE);
+
+      // Start the loaded graft.
+      self.runtime.link(Port::new_graft(entry), entry_node.0);
+    }
+    None => {
+      self.ivy_service.write_run_error(
+        &mut self.runtime,
+        result_output,
+        String::from(format!("Entry '{}' doesn't exist", entry)),
+        input,
+      );
+    }
+  }
+}*/
 
 #[derive(Default)]
 pub struct CaptureOutput {

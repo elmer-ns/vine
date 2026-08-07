@@ -34,12 +34,47 @@ impl From<Diag> for CompileError {
   }
 }
 
-/// An immutable, reusable handle to compiled Ivy code.
+#[derive(Clone, Copy)]
+pub struct GraftHandle<'ivm> {
+  graft: &'ivm Graft<'ivm>,
+}
+
+/// An immutable, reusable handle to a graft.
 ///
 /// The referenced graft is owned by the IVM's graft arena and remains valid
 /// for the entire `'ivm` lifetime.
+impl<'ivm> GraftHandle<'ivm> {
+  pub fn new(graft: &'ivm Graft<'ivm>) -> Self {
+    Self { graft }
+  }
+
+  pub fn graft(self) -> &'ivm Graft<'ivm> {
+    self.graft
+  }
+}
+
+impl<'ivm> ExtTyRegister<'ivm> for GraftHandle<'ivm> {
+  type With<'x> = GraftHandle<'x>;
+}
+
+impl<'ivm> ExtTyCastStatic<'ivm> for GraftHandle<'ivm> {
+  const COPY: bool = true;
+
+  fn into_payload_static(entry: Self) -> Word {
+    Word::from_ptr(entry.graft as *const Graft<'ivm> as *const ())
+  }
+
+  unsafe fn from_payload_static(payload: Word) -> Self {
+    Self { graft: unsafe { &*(payload.ptr() as *const Graft<'ivm>) } }
+  }
+}
+
+/// An immutable, reusable handle to a program.
+///
+/// The referenced program is owned by the IVM's program arena and remains valid
+/// for the entire `'ivm` lifetime.
 #[derive(Clone, Copy)]
-pub struct IvyModule<'ivm> {
+pub struct ProgramHandle<'ivm> {
   program: &'ivm Program<'ivm>,
 }
 
@@ -53,7 +88,7 @@ pub struct IvyModule<'ivm> {
 unsafe impl<'ivm> Send for Program<'ivm> {}
 unsafe impl<'ivm> Sync for Program<'ivm> {}
 
-impl<'ivm> IvyModule<'ivm> {
+impl<'ivm> ProgramHandle<'ivm> {
   pub fn new(program: &'ivm Program<'ivm>) -> Self {
     Self { program }
   }
@@ -63,11 +98,11 @@ impl<'ivm> IvyModule<'ivm> {
   }
 }
 
-impl<'ivm> ExtTyRegister<'ivm> for IvyModule<'ivm> {
-  type With<'x> = IvyModule<'x>;
+impl<'ivm> ExtTyRegister<'ivm> for ProgramHandle<'ivm> {
+  type With<'x> = ProgramHandle<'x>;
 }
 
-impl<'ivm> ExtTyCastStatic<'ivm> for IvyModule<'ivm> {
+impl<'ivm> ExtTyCastStatic<'ivm> for ProgramHandle<'ivm> {
   const COPY: bool = true;
 
   fn into_payload_static(module: Self) -> Word {

@@ -1,0 +1,35 @@
+
+use #root::Ivy;
+
+struct Payload({ left: N32, right: N32 });
+
+pub fn main(&io: &IO) {
+  let source = "iv:identity \{\n  ^ = ivm:x(value value)\n}";
+
+  let program = match Ivy::parse_ivy(source) {
+    Ok(module) { module }
+    Err(error) {
+      io.println("compile failed: {error}");
+      return;
+    }
+  };
+
+  let graft = match program.resolve("iv:identity") {
+    Ok(graft) { graft }
+    Err(error) {
+      io.println("resolve failed: {error}");
+      return;
+    }
+  };
+
+  let input = Payload({ left: 12, right: 34 });
+
+  let out = graft.invoke[Payload, Payload](input);
+  let &returned_io = graft.invoke[&IO, &IO](&io);
+
+  let Payload({ left, right }) = out;
+
+  io.println("{left} {right}");
+  returned_io.println("passed io reference survived");
+  returned_io.println("original io reference survived");
+}

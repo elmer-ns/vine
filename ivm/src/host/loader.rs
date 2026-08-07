@@ -3,7 +3,7 @@ use ivy::{name::Table, text::parser::Parser};
 use crate::{
   host::{
     Host,
-    module::{CompileError, IvyModule},
+    module::{CompileError, ProgramHandle},
   },
   program::Program,
   runtime::graft::Graft,
@@ -24,16 +24,16 @@ impl<'ivm> IvyLoader {
   ///
   /// May panic if the parsed Ivy cannot be encoded by the IVM, including
   /// references to unregistered extrinsics or malformed node arities.
-  pub fn compile(&mut self, host: &Host<'ivm>, src: &str) -> Result<IvyModule<'ivm>, CompileError> {
+  pub fn compile(&mut self, host: &Host<'ivm>, src: &str) -> Result<ProgramHandle<'ivm>, CompileError> {
     let nets = Parser::parse(&mut self.table, src)?;
     let nets = nets.to_flat_nets()?;
 
     let program = Program::new(host, &mut self.table, &nets);
 
-    Ok(IvyModule::new(host.ivm.programs.push(Box::new(program))))
+    Ok(ProgramHandle::new(host.ivm.programs.push(Box::new(program))))
   }
 
-  pub fn entry(&mut self, module: IvyModule<'ivm>, path: &str) -> Option<&'ivm Graft<'ivm>> {
+  pub fn entry(&mut self, module: ProgramHandle<'ivm>, path: &str) -> Option<&'ivm Graft<'ivm>> {
     let name = self.table.add_path_name(path);
     module.graft(name)
   }

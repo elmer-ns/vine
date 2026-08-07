@@ -1,36 +1,12 @@
 
-use #root::Ext;
+use #root::ivm::Program;
 
-pub type LoadError = String;
 pub type CompileError = String;
-pub type RunError = String;
 
-pub type Module;
+pub fn parse_ivy(source: String) -> Result[Program, CompileError] {
+  let result: Ext[Result[Program, CompileError]] = safe $ivy {
+    ${source as Ext} = vi:ext#1[root:ivy:parse](^)
+  };
 
-pub mod Module {
-  use #root::util::{duplicate, erase};
-
-  pub impl : Ext[Module] = safe Ext::identity;
-  pub impl : Fork[Module] = safe duplicate;
-  pub impl : Drop[Module] = safe erase;
-
-  pub fn compile(source: String) -> Result[Module, CompileError] {
-    let result: Ext[Result[Module, CompileError]] = safe $ivy {
-      ${source as Ext} = vi:ext#1[root:ivy:module:compile](^)
-    };
-
-    result as Result[Module, CompileError]
-  }
-
-  pub fn .run[I, O; Ext[I], Ext[O]](
-    module: Module,
-    entry: String,
-    input: I,
-  ) -> Result[O, (RunError, I)] {
-    let result: Ext[Result[O, (RunError, I)]] = safe $ivy {
-      ${module as Ext} = vi:ext#3[root:ivy:module:run](${entry as Ext} ${input as Ext} ^)
-    };
-
-    result as Result[O, (RunError, I)]
-  }
+  result as Result[Program, CompileError]
 }
