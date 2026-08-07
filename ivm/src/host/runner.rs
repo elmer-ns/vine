@@ -169,6 +169,34 @@ impl Write for SharedWriter<'_> {
   }
 }
 
+pub struct RunOutcome {
+  pub stats: Stats,
+  pub flags: Flags,
+  pub ivy_errors: Vec<LoadError>,
+}
+
+impl RunOutcome {
+  pub fn success(&self) -> bool {
+    self.flags.success() && self.ivy_errors.is_empty()
+  }
+
+  pub fn error_message(&self, debug_hint: bool) -> String {
+    let mut errors = self
+      .ivy_errors
+      .iter()
+      .map(|error| format!("Error: dynamic Ivy load failed: {error}"))
+      .collect::<Vec<_>>();
+
+    let runtime_errors = self.flags.error_message(debug_hint);
+
+    if !runtime_errors.is_empty() {
+      errors.push(runtime_errors);
+    }
+
+    errors.join("\n\n")
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -227,33 +255,5 @@ mod tests {
       outcome.ivy_errors,
       outcome.stats,
     );
-  }
-}
-
-pub struct RunOutcome {
-  pub stats: Stats,
-  pub flags: Flags,
-  pub ivy_errors: Vec<LoadError>,
-}
-
-impl RunOutcome {
-  pub fn success(&self) -> bool {
-    self.flags.success() && self.ivy_errors.is_empty()
-  }
-
-  pub fn error_message(&self, debug_hint: bool) -> String {
-    let mut errors = self
-      .ivy_errors
-      .iter()
-      .map(|error| format!("Error: dynamic Ivy load failed: {error}"))
-      .collect::<Vec<_>>();
-
-    let runtime_errors = self.flags.error_message(debug_hint);
-
-    if !runtime_errors.is_empty() {
-      errors.push(runtime_errors);
-    }
-
-    errors.join("\n\n")
   }
 }

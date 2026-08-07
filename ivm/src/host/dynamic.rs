@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::{
+  mem::take,
+  sync::{Arc, Mutex},
+};
 
 use ivy::name::Table;
 use vine_util::register::Register;
@@ -34,7 +37,7 @@ impl<'ivm> IvyRequests<'ivm> {
   }
 
   pub fn drain(&self) -> Vec<IvyRequest<'ivm>> {
-    std::mem::take(&mut *self.inner.lock().unwrap())
+    take(&mut *self.inner.lock().unwrap())
   }
 
   pub fn extrinsics(&self) -> impl Register<Host<'ivm>> + use<'ivm> {
