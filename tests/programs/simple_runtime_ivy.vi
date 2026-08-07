@@ -1,0 +1,17 @@
+
+use #root::Ivy;
+
+pub fn main(&io: &IO) {
+  let print_a =
+    "iv:main \{\n  ^ = ivm:x(io0 io1)\n  io0 = ivm:ext:merge[root:io:print_char](ivm:n32#65 io1)\n}"
+  ;
+
+  let print_b =
+    "iv:main \{\n  ^ = ivm:x(io0 io1)\n  io0 = ivm:ext:merge[root:io:print_char](ivm:n32#66 io1)\n}"
+  ;
+
+  Ivy::run(print_a, &io);
+  Ivy::run(print_b, &io);
+
+  io.println("C");
+}
