@@ -65,7 +65,7 @@ use crate::{
   system::Guide,
 };
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Program<'ivm> {
   grafts: HashMap<NameId, *const Graft<'ivm>>,
 }

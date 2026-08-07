@@ -31,7 +31,7 @@ use crate::{
 
 pub struct Runner<'ivm, 'ext> {
   host: &'ext Host<'ivm>,
-  ivy_loader: IvyLoader<'ivm>,
+  ivy_loader: IvyLoader,
   ivy_service: IvyService<'ivm>,
   ivy_errors: Vec<LoadError>,
 
@@ -51,6 +51,8 @@ impl<'ivm, 'ext> Runner<'ivm, 'ext> {
     let io = host.register_ext_ty::<IO>();
 
     let ivy_requests = IvyService::new(host, table);
+
+    let compile = table.add_path_name("root:ivy:module:compile");
 
     host.register(table, extrinsics);
 
@@ -119,28 +121,73 @@ impl<'ivm, 'ext> Runner<'ivm, 'ext> {
     }
 
     for request in requests {
-      let IvyRequest { source, value, result_output, value_output } = request;
+      match request {
+        IvyRequest::Compile { source, output } => {
+          let result =
+            self.ivy_loader.compile(self.host, &source).map_err(|error| error.to_string());
 
-      match self.ivy_loader.load(self.host, &source) {
-        Ok(main) => {
-          // `Ok(())`: source loaded and main was spliced successfully.
-          self.ivy_service.write_results(&mut self.runtime, result_output, Ok(Nil));
-
-          // Adapt the loaded main's IO→IO boundary to the suspended
-          // extrinsic input and output.
-          let node = unsafe { self.runtime.new_node(Tag::Comb, 0) };
-
-          self.runtime.link_wire(node.1, Port::new_ext_val(value));
-
-          self.runtime.link_wire_wire(node.2, value_output);
-
-          self.runtime.link(Port::new_graft(main), node.0);
+          self.ivy_service.write_compile_result(&mut self.runtime, output, result);
         }
-        Err(error) => {
-          self.ivy_service.write_results(&mut self.runtime, result_output, Err(error.to_string()));
+        IvyRequest::Update { source, value, result_output, value_output } => {
+          match self.ivy_loader.load_main(self.host, &source) {
+            Ok(main) => {
+              // `Ok(())`: source loaded and main was spliced successfully.
+              self.ivy_service.write_results(&mut self.runtime, result_output, Ok(Nil));
 
-          // Preserve the IO continuation despite the load failure.
-          self.runtime.link_wire(value_output, Port::new_ext_val(value));
+              // Adapt the loaded main's IO→IO boundary to the suspended
+              // extrinsic input and output.
+              let node = unsafe { self.runtime.new_node(Tag::Comb, 0) };
+
+              self.runtime.link_wire(node.1, Port::new_ext_val(value));
+
+              self.runtime.link_wire_wire(node.2, value_output);
+
+              self.runtime.link(Port::new_graft(main), node.0);
+            }
+            Err(error) => {
+              self.ivy_service.write_results(
+                &mut self.runtime,
+                result_output,
+                Err(error.to_string()),
+              );
+
+              // Preserve the IO continuation despite the load failure.
+              self.runtime.link_wire(value_output, Port::new_ext_val(value));
+            }
+          }
+        }
+        IvyRequest::Apply { source, input, result_output } => {
+          match self.ivy_loader.load_main(self.host, &source) {
+            Ok(main) => {
+              let main_node = unsafe { self.runtime.new_node(Tag::Comb, 0) };
+
+              let finish_node =
+                unsafe { self.runtime.new_node(Tag::ExtFn, self.ivy_service.finish_ok_label()) };
+
+              // I → loaded iv:main
+              self.runtime.link_wire(main_node.1, Port::new_ext_val(input));
+
+              // Loaded O → finish_ok principal port
+              self.runtime.link_wire(main_node.2, finish_node.0);
+
+              // finish_ok's first output → caller's Result
+              self.runtime.link_wire_wire(finish_node.1, result_output);
+
+              // The one-output finish extrinsic does not use its second auxiliary port.
+              self.runtime.link_wire(finish_node.2, Port::ERASE);
+
+              // Start the loaded graft.
+              self.runtime.link(Port::new_graft(main), main_node.0);
+            }
+            Err(error) => {
+              self.ivy_service.write_apply_error(
+                &mut self.runtime,
+                result_output,
+                error.to_string(),
+                input,
+              );
+            }
+          }
         }
       }
     }
@@ -245,7 +292,7 @@ mod tests {
     let (result_output, result_root) = runtime.new_wire();
     let (value_output, root) = runtime.new_wire();
 
-    ivy_requests.push(IvyRequest {
+    ivy_requests.push(IvyRequest::Update {
       source: IDENTITY_MAIN.to_owned(),
       value: io.wrap_static(IO),
       result_output,

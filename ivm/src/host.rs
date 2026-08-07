@@ -3,6 +3,7 @@ use std::{any::TypeId, collections::HashMap};
 use ivy::name::NameId;
 
 use crate::{
+  program::Program,
   runtime::{
     Runtime,
     allocator::Allocator,
@@ -16,18 +17,25 @@ use crate::{
 pub mod dynamic;
 pub mod ext;
 pub mod loader;
+pub mod module;
 pub mod runner;
 
 pub struct IVM<'ivm> {
   heaps: Arena<Heap>,
   pub(crate) grafts: Arena<[Graft<'ivm>]>,
   pub(crate) branches: Arena<Box<[*const Graft<'ivm>]>>,
+  pub(crate) programs: Arena<Program<'ivm>>,
 }
 
 impl<'ivm> IVM<'ivm> {
   #[allow(clippy::new_without_default)]
   pub fn new() -> Self {
-    Self { heaps: Default::default(), grafts: Default::default(), branches: Default::default() }
+    Self {
+      heaps: Default::default(),
+      grafts: Default::default(),
+      branches: Default::default(),
+      programs: Default::default(),
+    }
   }
 }
 

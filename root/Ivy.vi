@@ -2,9 +2,38 @@
 use #root::Ext;
 
 pub type LoadError = String;
+pub type CompileError = String;
 
-pub fn run[T; Ext[T]](source: String, &value: &T) -> Result[(), LoadError] {
-  let result: Ext = safe $ivy { ${value} = vi:ext#2[root:ivy:run](${source as Ext} ^ ${~value}) };
+pub type Module;
+
+pub mod Module {
+  use #root::util::{duplicate, erase};
+
+  pub impl : Ext[Module] = safe Ext::identity;
+  pub impl : Fork[Module] = safe duplicate;
+  pub impl : Drop[Module] = safe erase;
+
+  pub fn compile(source: String) -> Result[Module, CompileError] {
+    let result: Ext[Result[Module, CompileError]] = safe $ivy {
+      ${source as Ext} = vi:ext#1[root:ivy:module:compile](^)
+    };
+
+    result as Result[Module, CompileError]
+  }
+}
+
+pub fn update[T; Ext[T]](source: String, &value: &T) -> Result[(), LoadError] {
+  let result: Ext = safe $ivy {
+    ${value} = vi:ext#2[root:ivy:update](${source as Ext} ^ ${~value})
+  };
 
   result as Result[(), String]
+}
+
+pub fn apply[I, O; Ext[I], Ext[O]](source: String, input: I) -> Result[O, (LoadError, I)] {
+  let result: Ext[Result[O, (LoadError, I)]] = safe $ivy {
+    ${input as Ext} = vi:ext#2[root:ivy:apply](${source as Ext} ^)
+  };
+
+  result as Result[O, (LoadError, I)]
 }
