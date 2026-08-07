@@ -276,14 +276,14 @@ impl VineTestCommand {
       compiler.insert_main_net(table, &mut nets, test_id, &translator);
 
       eprint!("{grey}test{reset} {bold}{path}{reset} {grey}...{reset} ");
-      let (_, flags, output) = self.run_args.run_capture(table, &nets);
-      if flags.success() {
+      let (outcome, output) = self.run_args.run_capture(table, &nets);
+      if outcome.success() {
         eprintln!("{green}ok{reset}");
       } else {
         failed = true;
         eprintln!("{red}FAILED{reset}");
       }
-      if self.no_capture || !flags.success() {
+      if self.no_capture || !outcome.success() {
         io::stderr().write_all(&output)?;
         eprintln!();
       }

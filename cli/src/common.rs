@@ -5,9 +5,9 @@ use ivm::{
   host::{
     Host, IVM,
     ext::common,
-    runner::{CaptureOutput, Runner},
+    runner::{CaptureOutput, RunOutcome, Runner},
   },
-  runtime::{flags::Flags, heap::Heap, stats::Stats},
+  runtime::heap::Heap,
 };
 use ivy::{
   name::{NameId, Table},
@@ -38,20 +38,20 @@ impl RunArgs {
     let extrinsics = common::all(&self.args, io::stdin, io::stdout);
     let runner = Runner::new(&mut heap, &mut host, extrinsics, table, nets);
 
-    let (mut stats, flags) = runner.normalize(self.breadth_first, self.workers, ());
+    let mut outcome = runner.normalize(self.breadth_first, self.workers, ());
 
-    if !flags.success() {
-      eprintln!("\n{}", flags.error_message(debug_hint));
+    if !outcome.success() {
+      eprintln!("\n{}", outcome.error_message(debug_hint));
     }
 
     if !self.no_stats {
       if self.no_perf {
-        stats.clear_perf();
+        outcome.stats.clear_perf();
       }
-      eprintln!("{stats}");
+      eprintln!("{}", outcome.stats);
     }
 
-    if !flags.success() {
+    if !outcome.success() {
       exit(1);
     }
   }
@@ -61,12 +61,12 @@ impl RunArgs {
     &self,
     table: &mut Table,
     nets: &HashMap<NameId, FlatNet>,
-  ) -> (Stats, Flags, Vec<u8>) {
+  ) -> (RunOutcome, Vec<u8>) {
     let capture = CaptureOutput::default();
     let mut heap = self.heap();
     let mut ivm = IVM::new();
 
-    let (stats, flags) = {
+    let outcome = {
       let mut host = Host::new(&mut ivm);
       let extrinsics = capture.extrinsics(&self.args);
       let runner = Runner::new(&mut heap, &mut host, extrinsics, table, nets);
@@ -74,7 +74,7 @@ impl RunArgs {
       runner.normalize(self.breadth_first, self.workers, ())
     };
 
-    (stats, flags, capture.into_output())
+    (outcome, capture.into_output())
   }
 
   fn heap(&self) -> Box<Heap> {

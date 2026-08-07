@@ -15,7 +15,7 @@ use crate::{
     Host,
     dynamic::{IvyRequest, IvyRequests},
     ext::common::{self, IO},
-    loader::IvyLoader,
+    loader::{IvyLoader, LoadError},
   },
   program::Program,
   runtime::{
@@ -33,6 +33,7 @@ pub struct Runner<'ivm, 'ext> {
   host: &'ext Host<'ivm>,
   ivy_loader: IvyLoader<'ivm>,
   ivy_requests: IvyRequests<'ivm>,
+  ivy_errors: Vec<LoadError>,
 
   io: ExtTy<'ivm, IO>,
   runtime: Runtime<'ivm, 'ext>,
@@ -67,7 +68,7 @@ impl<'ivm, 'ext> Runner<'ivm, 'ext> {
     runtime.link_wire(node.1, Port::new_ext_val(io.wrap_static(IO)));
     runtime.link(Port::new_graft(main), node.0);
 
-    Self { host, ivy_loader, ivy_requests, io, root: node.2, runtime }
+    Self { host, ivy_loader, ivy_requests, ivy_errors: Vec::new(), io, root: node.2, runtime }
   }
 
   pub fn normalize(
@@ -75,7 +76,7 @@ impl<'ivm, 'ext> Runner<'ivm, 'ext> {
     breadth_first: bool,
     workers: usize,
     mut hooks: impl Hooks,
-  ) -> (Stats, Flags) {
+  ) -> RunOutcome {
     loop {
       // One normalization epoch.
       if breadth_first {
@@ -99,7 +100,7 @@ impl<'ivm, 'ext> Runner<'ivm, 'ext> {
       out.tag() != Tag::ExtVal || unsafe { out.as_ext_val() }.ty_id() != self.io.id();
     self.runtime.flags.vicious = self.runtime.stats.mem_free < self.runtime.stats.mem_alloc;
 
-    (self.runtime.stats, self.runtime.flags)
+    RunOutcome { stats: self.runtime.stats, flags: self.runtime.flags, ivy_errors: self.ivy_errors }
   }
 
   fn service_ivy_requests(&mut self) -> bool {
@@ -124,10 +125,10 @@ impl<'ivm, 'ext> Runner<'ivm, 'ext> {
 
           self.runtime.link(Port::new_graft(main), node.0);
         }
-        Err(_error) => {
-          // Preserve the IO chain so the graph remains structurally
-          // usable, while recording that execution failed.
-          self.runtime.flags.ext_generic = true;
+        Err(error) => {
+          self.ivy_errors.push(error);
+
+          // Preserve the IO continuation despite the load failure.
           self.runtime.link_wire(output, Port::new_ext_val(io));
         }
       }
@@ -214,10 +215,45 @@ mod tests {
 
     // We construct Runner directly because this test starts at the precise
     // state immediately after root:ivy:run has enqueued its request.
-    let runner = Runner { host, ivy_loader, ivy_requests, io, runtime, root };
+    let runner =
+      Runner { host, ivy_loader, ivy_requests, ivy_errors: Vec::new(), io, runtime, root };
 
-    let (stats, flags) = runner.normalize(false, 0, ());
+    let outcome = runner.normalize(false, 0, ());
 
-    assert!(flags.success(), "dynamic Ivy execution failed:\nflags: {flags:#?}\nstats: {stats:#?}",);
+    assert!(
+      outcome.success(),
+      "dynamic Ivy execution failed:\nflags: {:#?}\nerrors: {:#?}\nstats: {:#?}",
+      outcome.flags,
+      outcome.ivy_errors,
+      outcome.stats,
+    );
+  }
+}
+
+pub struct RunOutcome {
+  pub stats: Stats,
+  pub flags: Flags,
+  pub ivy_errors: Vec<LoadError>,
+}
+
+impl RunOutcome {
+  pub fn success(&self) -> bool {
+    self.flags.success() && self.ivy_errors.is_empty()
+  }
+
+  pub fn error_message(&self, debug_hint: bool) -> String {
+    let mut errors = self
+      .ivy_errors
+      .iter()
+      .map(|error| format!("Error: dynamic Ivy load failed: {error}"))
+      .collect::<Vec<_>>();
+
+    let runtime_errors = self.flags.error_message(debug_hint);
+
+    if !runtime_errors.is_empty() {
+      errors.push(runtime_errors);
+    }
+
+    errors.join("\n\n")
   }
 }

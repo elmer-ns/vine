@@ -1,3 +1,5 @@
+use std::{error::Error, fmt};
+
 use ivy::{
   name::Table,
   text::{ast::Diag, parser::Parser},
@@ -15,6 +17,17 @@ pub enum LoadError {
   Ivy(Diag),
   MissingMain,
 }
+
+impl fmt::Display for LoadError {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      LoadError::Ivy(diag) => write!(f, "invalid Ivy: {diag}"),
+      LoadError::MissingMain => write!(f, "the loaded program does not define 'iv:main'"),
+    }
+  }
+}
+
+impl Error for LoadError {}
 
 impl From<Diag> for LoadError {
   fn from(error: Diag) -> Self {
