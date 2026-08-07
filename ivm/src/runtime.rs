@@ -130,3 +130,19 @@ impl Hooks for () {
     stats.time_clock += start.elapsed();
   }
 }
+
+impl<H: Hooks + ?Sized> Hooks for &mut H {
+  type Instant = H::Instant;
+
+  fn now(&mut self) -> Self::Instant {
+    (**self).now()
+  }
+
+  fn tick(&mut self, start: &Self::Instant, stats: &mut Stats) {
+    (**self).tick(start, stats);
+  }
+
+  fn end(&mut self, start: &Self::Instant, stats: &mut Stats) {
+    (**self).end(start, stats);
+  }
+}

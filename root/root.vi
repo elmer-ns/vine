@@ -8,6 +8,7 @@ pub mod debug;
 pub mod derive;
 pub mod Ext;
 pub mod logical;
+pub mod Ivy;
 pub mod numeric;
 pub mod ops;
 pub mod rng;

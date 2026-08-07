@@ -13,7 +13,9 @@ use crate::{
   util::Arena,
 };
 
+pub mod dynamic;
 pub mod ext;
+pub mod loader;
 pub mod runner;
 
 pub struct IVM<'ivm> {
