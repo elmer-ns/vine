@@ -1,8 +1,8 @@
 
 use #root::Ext;
 
-pub fn run(source: String, &io: &IO) {
-  let source: Ext[String] = source as Ext;
+pub fn run(source: String, &io: &IO) -> Result[(), String] {
+  let result: Ext = safe $ivy { ${io} = vi:ext#2[root:ivy:run](${source as Ext} ^ ${~io}) };
 
-  safe $ivy { ${io} = vi:ext#2[root:ivy:run](${source} ${~io}) }
+  result as Result[(), String]
 }

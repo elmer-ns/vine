@@ -4,8 +4,8 @@
 use #root::Ivy;
 
 pub fn main(&io: &IO) {
-  Ivy::run("this definetly is not valid Ivy", &io);
-
-  // This proves the failure path rethreads IO instead of hanging.
-  io.println("outer program survived");
+  match Ivy::run("not valid Ivy", &io) {
+    Ok(()) { io.println("unexpected") }
+    Err(error) { io.println("caught: {error}") }
+  }
 }
