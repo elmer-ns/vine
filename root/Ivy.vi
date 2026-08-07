@@ -1,7 +1,9 @@
 
 use #root::Ext;
 
-pub fn run(source: String, &io: &IO) -> Result[(), String] {
+pub type LoadError = String;
+
+pub fn run(source: String, &io: &IO) -> Result[(), LoadError] {
   let result: Ext = safe $ivy { ${io} = vi:ext#2[root:ivy:run](${source as Ext} ^ ${~io}) };
 
   result as Result[(), String]
