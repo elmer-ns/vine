@@ -4,7 +4,7 @@
 use #root::Ivy;
 
 pub fn main(&io: &IO) {
-  match Ivy::run("not valid Ivy", &io) {
+  match Ivy::Module::compile("not valid Ivy") {
     Ok(()) { io.println("unexpected") }
     Err(error) { io.println("caught: {error}") }
   }
