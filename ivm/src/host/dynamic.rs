@@ -20,9 +20,9 @@ use crate::{
 
 pub struct IvyRequest<'ivm> {
   pub(crate) source: String,
-  pub(crate) io: ExtVal<'ivm>,
+  pub(crate) value: ExtVal<'ivm>,
   pub(crate) result_output: Wire<'ivm>,
-  pub(crate) io_output: Wire<'ivm>,
+  pub(crate) value_output: Wire<'ivm>,
 }
 
 #[derive(Clone, Default)]
@@ -43,16 +43,10 @@ impl<'ivm> IvyRequests<'ivm> {
     let requests = self.clone();
 
     ExtFn("root:ivy:run", move |host: &mut Host<'ivm>, _: &mut Table| {
-      let io_ty = host.register_ext_ty::<IO>();
-
       move |rt: &mut Runtime<'ivm, '_>,
-            (io, source): (ExtVal<'ivm>, String),
-            [result_output, io_output]: [Wire<'ivm>; 2]| {
-        if io.ty_id() != io_ty.id() {
-          return error(rt, [result_output, io_output]);
-        }
-
-        requests.push(IvyRequest { source, io, result_output, io_output });
+            (value, source): (ExtVal<'ivm>, String),
+            [result_output, value_output]: [Wire<'ivm>; 2]| {
+        requests.push(IvyRequest { source, value, result_output, value_output });
       }
     })
   }

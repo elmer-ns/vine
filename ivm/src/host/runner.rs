@@ -119,7 +119,7 @@ impl<'ivm, 'ext> Runner<'ivm, 'ext> {
     }
 
     for request in requests {
-      let IvyRequest { source, io, result_output, io_output } = request;
+      let IvyRequest { source, value, result_output, value_output } = request;
 
       match self.ivy_loader.load(self.host, &source) {
         Ok(main) => {
@@ -130,9 +130,9 @@ impl<'ivm, 'ext> Runner<'ivm, 'ext> {
           // extrinsic input and output.
           let node = unsafe { self.runtime.new_node(Tag::Comb, 0) };
 
-          self.runtime.link_wire(node.1, Port::new_ext_val(io));
+          self.runtime.link_wire(node.1, Port::new_ext_val(value));
 
-          self.runtime.link_wire_wire(node.2, io_output);
+          self.runtime.link_wire_wire(node.2, value_output);
 
           self.runtime.link(Port::new_graft(main), node.0);
         }
@@ -140,7 +140,7 @@ impl<'ivm, 'ext> Runner<'ivm, 'ext> {
           self.ivy_service.write_results(&mut self.runtime, result_output, Err(error.to_string()));
 
           // Preserve the IO continuation despite the load failure.
-          self.runtime.link_wire(io_output, Port::new_ext_val(io));
+          self.runtime.link_wire(value_output, Port::new_ext_val(value));
         }
       }
     }
@@ -243,13 +243,13 @@ mod tests {
     let mut runtime = host.init(&mut heap);
 
     let (result_output, result_root) = runtime.new_wire();
-    let (io_output, root) = runtime.new_wire();
+    let (value_output, root) = runtime.new_wire();
 
     ivy_requests.push(IvyRequest {
       source: IDENTITY_MAIN.to_owned(),
-      io: io.wrap_static(IO),
+      value: io.wrap_static(IO),
       result_output,
-      io_output,
+      value_output,
     });
 
     // We will inspect the IO result manually, so make one unused Runner-root

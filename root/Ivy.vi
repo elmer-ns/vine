@@ -3,8 +3,8 @@ use #root::Ext;
 
 pub type LoadError = String;
 
-pub fn run(source: String, &io: &IO) -> Result[(), LoadError] {
-  let result: Ext = safe $ivy { ${io} = vi:ext#2[root:ivy:run](${source as Ext} ^ ${~io}) };
+pub fn run[T; Ext[T]](source: String, &value: &T) -> Result[(), LoadError] {
+  let result: Ext = safe $ivy { ${value} = vi:ext#2[root:ivy:run](${source as Ext} ^ ${~value}) };
 
   result as Result[(), String]
 }
