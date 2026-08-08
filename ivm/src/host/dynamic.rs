@@ -109,7 +109,7 @@ impl<'ivm> DynamicProgramService<'ivm> {
     Self { requests, encode_compile_result, encode_resolve_result }
   }
 
-  pub fn _push(&self, request: DynamicProgramRequest<'ivm>) {
+  pub fn push(&self, request: DynamicProgramRequest<'ivm>) {
     self.requests.push(request);
   }
 
